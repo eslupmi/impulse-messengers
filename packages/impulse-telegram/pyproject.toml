@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "impulse-telegram"
+version = "0.1.0"
+description = "Telegram messenger provider for IMPulse"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+dependencies = ["impulse-bot>=3.7.1,<4.0", "pydantic~=2.11.7", "PyJWT[crypto]~=2.10.1"]
+
+[project.entry-points."impulse.messengers"]
+telegram = "impulse_telegram.plugin:plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+impulse_telegram = ["resources/*.j2", "py.typed"]

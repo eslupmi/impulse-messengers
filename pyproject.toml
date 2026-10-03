@@ -1,0 +1,19 @@
+[project]
+name = "impulse-messengers-workspace"
+version = "0.1.0"
+description = "Development workspace for the IMPulse messenger libraries"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+impulse-bot = { path = "../impulse", editable = true }
+
+[tool.ruff.lint]
+# Preserve the existing correctness gate across Ruff default-rule changes.
+select = ["E4", "E7", "E9", "F"]

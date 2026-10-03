@@ -11,10 +11,18 @@ payloads, interactions, authentication and Jinja templates.
 | `impulse-telegram` | `impulse_telegram` | `telegram` |
 
 Python 3.10 or newer is required. All providers use the version 1 contract
-from `impulse_messenger_api`, supplied by `impulse-bot>=3.7.1,<4.0`, and register
+from `impulse_messenger_api`, supplied by `impulse-bot==3.8.0`, and register
 through the `impulse.messengers` entry-point group. Installing a provider makes
 it available to IMPulse; select it with the existing `messenger.type` setting.
 The `none` provider remains in IMPulse and needs no messenger library.
+
+## Release versions
+
+The next release is `3.8.0` for IMPulse and all three messenger libraries.
+Core and provider versions must match: each `3.8.0` library requires
+`impulse-bot==3.8.0`. Messenger libraries have no independent version bumps;
+update a library to the target IMPulse version only when that IMPulse release
+requires library changes.
 
 ## Local development
 
@@ -75,7 +83,8 @@ uv run --no-sync python scripts/verify-packages.py
 Use `--uv /path/to/uv` or `--core /path/to/impulse` when needed. The script builds
 all four distributions, rebuilds wheels from their source archives, and creates
 temporary environments containing core alone or core plus one provider. It checks
-isolated discovery, configuration, `python -I -m main --check`, bundled static/Jira
+matching release versions and exact core dependency pins, isolated discovery,
+configuration, `python -I -m main --check`, bundled static/Jira
 resources, all provider templates, delivery through the real core facade with a
 fake HTTP transport, malformed callbacks, response cleanup and provider removal.
 It uses no messenger accounts or live provider requests. Logs and artifacts remain
@@ -100,5 +109,5 @@ core tag or commit. This workflow builds and verifies packages without publishin
 On failure, the hosted job output includes the failing command's log path and
 final 15 lines; full files remain only on the temporary runner until it is removed.
 
-Publication is a separate step; these initial `0.1.0` libraries have not been
+Publication is a separate step; the prepared `3.8.0` libraries have not been
 published by this extraction.

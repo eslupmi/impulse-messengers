@@ -1,13 +1,23 @@
-"""The package probe must reject requests outside its explicit fixtures."""
+"""The package probe rejects release mismatches and unexpected requests."""
 
 from pathlib import Path
 import runpy
 import unittest
+from unittest.mock import patch
 
 
-FakeTransport = runpy.run_path(
+harness = runpy.run_path(
     str(Path(__file__).resolve().parents[1] / 'scripts' / 'verify-packages.py')
-)['FakeTransport']
+)
+FakeTransport = harness['FakeTransport']
+
+
+class ReleaseVersionTests(unittest.TestCase):
+    def test_rejects_mismatched_installed_release_versions(self):
+        versions = {'impulse-bot': '3.8.0', 'impulse-slack': '3.7.1'}
+        with patch('importlib.metadata.version', side_effect=versions.__getitem__):
+            with self.assertRaisesRegex(AssertionError, 'Release version mismatch'):
+                harness['probe']('slack')
 
 
 class TransportTests(unittest.IsolatedAsyncioTestCase):

@@ -4,6 +4,7 @@
 import argparse
 import asyncio
 import importlib
+from email.parser import Parser
 import json
 import os
 from pathlib import Path
@@ -39,7 +40,14 @@ def installed_module(name):
 
 
 def probe(provider_id):
-    from importlib.metadata import entry_points
+    from importlib.metadata import entry_points, version
+
+    core_version = version('impulse-bot')
+    if provider_id != 'none':
+        provider_version = version(f'impulse-{provider_id}')
+        assert provider_version == core_version, (
+            f'Release version mismatch: impulse-{provider_id}={provider_version}; impulse-bot={core_version}'
+        )
 
     api = installed_module('impulse_messenger_api')
     assert Path(api.__file__).with_name('py.typed').is_file()
@@ -263,11 +271,13 @@ def verify(uv, core, keep_artifacts):
             run([uv, 'build', str(archive), '--wheel', '--no-sources', '--out-dir', str(rebuilt)])
         wheels = {wheel.name.split('-')[0]: wheel for wheel in rebuilt.glob('*.whl')}
         assert set(wheels) == {'impulse_bot', *(f'impulse_{provider}' for provider in PROVIDERS)}, wheels
+        release_metadata = {}
         for name, wheel in wheels.items():
             with ZipFile(wheel) as archive:
                 metadata_name = next(item for item in archive.namelist() if item.endswith('.dist-info/METADATA'))
-                metadata = archive.read(metadata_name).decode()
-                requirements = [line for line in metadata.splitlines() if line.startswith('Requires-Dist:')]
+                metadata = Parser().parsestr(archive.read(metadata_name).decode())
+                release_metadata[name] = metadata
+                requirements = metadata.get_all('Requires-Dist', [])
                 assert all(' @ ' not in line and 'file:' not in line for line in requirements), requirements
                 if name == 'impulse_bot':
                     assert not {'app/im/plugin_api.py', 'app/im/plugin_config.py', 'app/im/providers/legacy.py', 'app/im/colors.py'} & set(
@@ -278,7 +288,19 @@ def verify(uv, core, keep_artifacts):
                 else:
                     assert sum(item.startswith(name + '/resources/') and item.endswith('.j2')
                                for item in archive.namelist()) == 13
-        print('PASS four independent sdists rebuilt into wheels', flush=True)
+        core_version = release_metadata['impulse_bot']['Version']
+        assert core_version, 'Core wheel is missing its release version'
+        for name, metadata in release_metadata.items():
+            assert metadata['Version'] == core_version, (
+                f"Release version mismatch: {name}={metadata['Version']}; impulse-bot={core_version}"
+            )
+            if name != 'impulse_bot':
+                core_requirements = [requirement for requirement in metadata.get_all('Requires-Dist', [])
+                                     if requirement.startswith('impulse-bot')]
+                assert core_requirements == [f'impulse-bot=={core_version}'], (
+                    f'{name} must pin its matching core release: {core_requirements}'
+                )
+        print(f'PASS four independent sdists rebuilt into wheels at release {core_version}', flush=True)
 
         script = str(Path(__file__).resolve())
         for provider_id in ('none', *PROVIDERS):

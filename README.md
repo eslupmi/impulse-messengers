@@ -10,22 +10,14 @@ payloads, interactions, authentication and Jinja templates.
 | `impulse-mattermost` | `impulse_mattermost` | `mattermost` |
 | `impulse-telegram` | `impulse_telegram` | `telegram` |
 
-Python 3.10 or newer is required. All providers use the version 1 contract
-from `impulse_messenger_api`, supplied by `impulse-bot==3.8.0`, and register
+Python 3.10 or newer is required. All providers use the public contract
+from `impulse_messenger_api`, supplied by `impulse-bot`, and register
 through the `impulse.messengers` entry-point group. Installing a provider makes
 it available to IMPulse; select it with the existing `messenger.type` setting.
 IMPulse imports and validates only the provider selected by `messenger.type`;
 other installed providers stay unloaded. Restart after installing/removing
 libraries or changing messenger type.
 The `none` provider remains in IMPulse and needs no messenger library.
-
-## Release versions
-
-The next release is `3.8.0` for IMPulse and all three messenger libraries.
-Core and provider versions must match: each `3.8.0` library requires
-`impulse-bot==3.8.0`. Messenger libraries have no independent version bumps;
-update a library to the target IMPulse version only when that IMPulse release
-requires library changes.
 
 ## Local development
 
@@ -113,7 +105,8 @@ on failure; `--keep-artifacts` also preserves successful evidence.
 The `Verify messenger libraries` workflow synchronizes this workspace, then runs
 linting, verification-harness regression tests, the full IMPulse integration
 suite and the same installed-package verification on pushes, pull requests and
-manual dispatches, using Python 3.10, uv 0.12.22 and Ruff 0.16.10.
+manual dispatches, using Python 3.10 and the tools pinned in the workflow
+and workspace lockfile.
 It checks out this repository alongside `eslupmi/impulse` at `messenger-split`.
 For a coordinated change on another core revision, manually dispatch the workflow
 with its branch, tag or commit in `core_ref`.
@@ -127,5 +120,4 @@ core tag or commit. This workflow builds and verifies packages without publishin
 On failure, the hosted job output includes the failing command's log path and
 final 15 lines; full files remain only on the temporary runner until it is removed.
 
-Publication is a separate step; the prepared `3.8.0` libraries have not been
-published by this extraction.
+Publication is a separate step from building and verification.

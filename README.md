@@ -39,21 +39,32 @@ parent/
 ```
 
 From `impulse-messengers`, install all three libraries and the sibling IMPulse
-checkout in editable mode using the shared lockfile:
+checkout in editable mode, plus test and lint tools, using the shared lockfile:
 
 ```sh
 uv sync --all-packages --locked
-uv run --all-packages python -c "from importlib.metadata import entry_points; print([ep.name for ep in entry_points(group='impulse.messengers')])"
+uv run --all-packages --no-sync python -c "from importlib.metadata import entry_points; print([ep.name for ep in entry_points(group='impulse.messengers')])"
 ```
 
-The root project is a development workspace and is not distributed. Dependencies
-are declared in each library's `pyproject.toml`; `uv.lock` records the combined
-resolution. After changing dependencies, run `uv lock` and repeat `uv sync`.
-The sibling path in `tool.uv.sources` is a development override: wheel metadata
-contains the `impulse-bot` version requirement, without a checkout path.
+The root project is a development workspace and is not distributed. Each library
+declares its runtime dependencies; the root declares the shared test and lint
+tools. `uv.lock` records the combined resolution. After changing dependencies,
+run `uv lock` and repeat `uv sync`. This workspace's sibling `impulse-bot` source
+is an editable development override: wheel metadata contains the matching core
+version requirement, without a checkout path. Core's own uv configuration has no
+messenger dependency or sibling source override.
 
-IMPulse's existing provider tests live in the sibling repository. Run them from
-its directory after its documented `uv sync` preparation.
+The existing full IMPulse test suite stays in the core repository and includes
+provider integration tests. Run it with this workspace's environment and the
+core checkout as the working directory:
+
+```sh
+cp ../impulse/examples/impulse.none.yml ../impulse/impulse.yml
+uv run --project "$PWD" --directory ../impulse --all-packages --no-sync python -m pytest tests/ -q
+```
+
+Core's default `uv sync` installs its own test and lint tools, without providers;
+the full suite requires the combined environment above.
 
 ## Build
 
@@ -85,7 +96,9 @@ uv run --no-sync python scripts/verify-packages.py
 
 Use `--uv /path/to/uv` or `--core /path/to/impulse` when needed. The script builds
 all four distributions, rebuilds wheels from their source archives, and creates
-temporary environments containing core alone or core plus one provider. It checks
+temporary environments containing core alone or core plus one provider. It also
+extracts core into a directory without the messenger checkout and verifies normal
+locked synchronization, the CLI and linting. It checks
 matching release versions and exact core dependency pins, isolated discovery,
 configuration, `python -I -m main --check`, bundled static/Jira
 resources, all provider templates, delivery through the real core facade with a
@@ -97,10 +110,10 @@ on failure; `--keep-artifacts` also preserves successful evidence.
 
 ## Continuous integration
 
-The `Verify messenger libraries` workflow runs linting, verification-harness
-regression tests and the same installed-package verification on pushes, pull
-requests and manual dispatches, using Python 3.10, uv 0.12.22 and Ruff 0.16.10
-(the version in IMPulse's lockfile).
+The `Verify messenger libraries` workflow synchronizes this workspace, then runs
+linting, verification-harness regression tests, the full IMPulse integration
+suite and the same installed-package verification on pushes, pull requests and
+manual dispatches, using Python 3.10, uv 0.12.22 and Ruff 0.16.10.
 It checks out this repository alongside `eslupmi/impulse` at `messenger-split`.
 For a coordinated change on another core revision, manually dispatch the workflow
 with its branch, tag or commit in `core_ref`.

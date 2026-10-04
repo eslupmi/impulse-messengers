@@ -320,6 +320,23 @@ def verify(uv, core, keep_artifacts):
         print(f'PASS four independent sdists rebuilt into wheels at release {core_version}', flush=True)
 
         script = str(Path(__file__).resolve())
+        standalone_root = temporary / 'standalone-core'
+        shutil.unpack_archive(str(next(dist.glob('impulse_bot-*.tar.gz'))), str(standalone_root))
+        standalone = next(standalone_root.iterdir())
+        assert not (standalone.parent / 'impulse-messengers').exists()
+        shutil.copyfile(core / 'uv.lock', standalone / 'uv.lock')
+        run([uv, 'lock', '--check'], cwd=standalone)
+        run([uv, 'sync', '--locked', '--python', sys.executable], cwd=standalone)
+        source_python = standalone / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+        run([str(source_python), '-I', '-c',
+             'from importlib.metadata import entry_points; from app.im.registry import get_provider_registry; '
+             'assert not entry_points(group="impulse.messengers"); '
+             'assert get_provider_registry().resolve("none").descriptor.messaging_enabled is False'])
+        run([str(source_python), '-I', '-m', 'main', '--check'])
+        run([str(source_python), '-m', 'ruff', 'check', 'app', 'impulse_messenger_api', 'main.py',
+             '--target-version', 'py310'], cwd=standalone)
+        print('PASS standalone core source: locked sync, none discovery, CLI and lint without messenger checkout', flush=True)
+
         for provider_id in ('none', *PROVIDERS):
             config_file.write_text(json.dumps(configuration(provider_id)), encoding='utf-8')
             virtualenv = temporary / provider_id

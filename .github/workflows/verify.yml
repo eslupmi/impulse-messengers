@@ -44,9 +44,16 @@ jobs:
         with:
           version: "0.12.22"
           python-version: "3.10"
+      - name: Synchronize integration workspace
+        run: uv sync --all-packages --locked
       - name: Lint libraries and verification harness
-        run: uv tool run --from ruff==0.16.10 ruff check packages scripts tests --target-version py310
+        run: uv run --no-sync ruff check packages scripts tests --target-version py310
       - name: Test verification harness
-        run: uv run --no-project python -m unittest discover -s tests
+        run: uv run --no-sync python -m unittest discover -s tests
+      - name: Run IMPulse integration tests
+        run: |
+          cp ../impulse/examples/impulse.none.yml ../impulse/impulse.yml
+          CONFIG_PATH="$PWD/../impulse" DATA_PATH=/tmp/impulse-test-data \
+            uv run --project "$PWD" --directory ../impulse --no-sync python -m pytest tests/ --color=yes -v
       - name: Verify installed packages
-        run: uv run --no-project python scripts/verify-packages.py --core ../impulse
+        run: uv run --no-sync python scripts/verify-packages.py --core ../impulse

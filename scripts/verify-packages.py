@@ -87,9 +87,12 @@ def probe(provider_id):
     jira = JiraIntegration(None)
     for name in ('summary', 'description'):
         assert jira._read_template(name).template
+    probe_jira_template_overrides(jira)
 
     if provider_id != 'none':
         asyncio.run(probe_provider(provider_id, registry))
+    assert type(validate_config(configuration('none')).messenger.type) is str
+    assert registry.resolve('none').descriptor.messaging_enabled is False
 
 
 def probe_selection(provider_id):
@@ -107,6 +110,101 @@ def probe_selection(provider_id):
     loaded = {provider for provider in PROVIDERS if f'impulse_{provider}' in sys.modules}
     expected = set() if provider_id == 'none' else {provider_id}
     assert loaded == expected, f'{provider_id} startup imported unexpected providers: {loaded}'
+
+
+def probe_jira_template_overrides(jira):
+    from app.config.config import get_config
+    from app.config.validation import TaskManagementConfig
+
+    names = ('summary', 'description')
+    defaults = {name: jira._read_template(name).template for name in names}
+    config = get_config().app
+    previous_task_management, previous_cwd = config.task_management, Path.cwd()
+    incident = SimpleNamespace(marker='готово')
+    with tempfile.TemporaryDirectory(prefix='impulse-jira-templates-') as directory:
+        try:
+            os.chdir(directory)
+            Path('templates').mkdir()
+            for name in names:
+                Path(f'templates/jira_{name}.j2').write_text(
+                    f'Jira {name} — настроено {{{{ incident.marker }}}}', encoding='utf-8')
+            assert jira.format_incident_for_jira(incident) == tuple(f'Jira {name} — настроено готово' for name in names)
+            Path('templates/jira_summary.j2').unlink()
+            assert jira._read_template('summary').template == defaults['summary']
+            assert 'настроено' in jira._read_template('description').template
+            Path('templates/jira_summary.j2').write_text('', encoding='utf-8')
+            assert jira.format_incident_for_jira(incident)[0] == ''
+            explicit_paths = {}
+            for name in names:
+                path = Path(f'explicit-{name}.j2')
+                path.write_text(f'Jira {name} — выбран {{{{ incident.marker }}}}', encoding='utf-8')
+                explicit_paths[name] = str(path)
+            config.task_management = TaskManagementConfig(
+                type='jira', project_key='FIXTURE', template_files=explicit_paths)
+            assert jira.format_incident_for_jira(incident) == tuple(f'Jira {name} — выбран готово' for name in names)
+        finally:
+            config.task_management = previous_task_management
+            os.chdir(previous_cwd)
+    assert {name: jira._read_template(name).template for name in names} == defaults
+
+
+def probe_messenger_template_overrides(provider_id, registration, config):
+    from impulse_messenger_api import REQUIRED_TEMPLATE_NAMES
+    from app.config.validation import validate_config
+    from app.im.helpers import get_application
+    from app.im.registry import get_provider_registry
+    from app.im.template import ProviderTemplates
+
+    incident_names = ('body', 'header', 'status_icons')
+    defaults = {name: registration.template_source(name) for name in REQUIRED_TEMPLATE_NAMES}
+    channels = {'default': {'id': config.channels['default'].id}}
+    incident = SimpleNamespace(payload={'marker': 'готово'}, parents=[], childs=[], serialize=lambda: {})
+    previous_cwd = Path.cwd()
+    with tempfile.TemporaryDirectory(prefix=f'impulse-{provider_id}-templates-') as directory:
+        try:
+            os.chdir(directory)
+            Path('templates').mkdir()
+            Path('thread_templates').mkdir()
+            paths = {}
+            for name in REQUIRED_TEMPLATE_NAMES:
+                folder = 'templates' if name in incident_names else 'thread_templates'
+                paths[name] = Path(folder) / f'{provider_id}_{name}.j2'
+                paths[name].write_text(f'{provider_id}:{name} — настроено {{{{ payload.marker }}}}', encoding='utf-8')
+            app = get_application(config, channels, 'default')
+            assert app.form_body_header_status_icons(incident) == tuple(
+                f'{provider_id}:{name} — настроено готово' for name in incident_names)
+            for name in set(REQUIRED_TEMPLATE_NAMES) - set(incident_names):
+                rendered = app.notification_template(ProviderTemplates(name)[provider_id]).form_notification(payload=incident.payload)
+                assert rendered == f'{provider_id}:{name} — настроено готово'
+            for name in ('header', 'chain_step_user'):
+                paths[name].unlink()
+            assert get_application(config, channels, 'default').header_template.template == defaults['header']
+            assert ProviderTemplates('chain_step_user')[provider_id] == defaults['chain_step_user']
+            for name in ('body', 'chain_step_group'):
+                paths[name].write_text('', encoding='utf-8')
+            app = get_application(config, channels, 'default')
+            assert app.body_template.form_message({}) == ''
+            assert app.notification_template(ProviderTemplates('chain_step_group')[provider_id]).form_notification() == ''
+            explicit_paths = {}
+            for name in incident_names:
+                path = Path(f'explicit-{name}.j2')
+                path.write_text(f'{provider_id}:{name} — выбран {{{{ payload.marker }}}}', encoding='utf-8')
+                explicit_paths[name] = str(path)
+            paths['body'].unlink()
+            paths['body'].mkdir()
+            explicit_config = configuration(provider_id)
+            explicit_config['messenger']['template_files'] = explicit_paths
+            get_provider_registry.cache_clear()
+            app = get_application(validate_config(explicit_config).messenger, channels, 'default')
+            assert app.form_body_header_status_icons(incident) == tuple(
+                f'{provider_id}:{name} — выбран готово' for name in incident_names)
+        finally:
+            os.chdir(previous_cwd)
+    for name in set(REQUIRED_TEMPLATE_NAMES) - set(incident_names):
+        assert ProviderTemplates(name)[provider_id] == defaults[name]
+    app = get_application(config, channels, 'default')
+    assert tuple(template.template for template in (app.body_template, app.header_template, app.status_icons_template)) == tuple(
+        defaults[name] for name in incident_names)
 
 
 class FakeResponse:
@@ -210,6 +308,7 @@ async def probe_provider(provider_id, registry):
         raise AssertionError('Provider accepted missing credentials')
 
     os.environ.update(FIXTURE_SECRETS)
+    probe_messenger_template_overrides(provider_id, registration, config)
     app = get_application(config, {'default': {'id': config.channels['default'].id}}, 'default')
     assert type(app) is Application and type(app.provider) is registration.factory
     transport = FakeTransport(provider_id)

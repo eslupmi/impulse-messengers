@@ -19,6 +19,23 @@ other installed providers stay unloaded. Restart after installing/removing
 libraries or changing messenger type.
 The `none` provider remains in IMPulse and needs no messenger library.
 
+## Template overrides
+
+IMPulse's shared renderer checks the same user template paths as before extraction,
+then falls back to each installed provider's packaged defaults:
+
+| Templates | Override path |
+| --- | --- |
+| Incident body, header and status icons | `templates/<messenger>_<name>.j2` |
+| Chain steps and thread notifications | `thread_templates/<messenger>_<name>.j2` |
+
+`<messenger>` is the configured `messenger.type`. Paths are relative to the process
+working directory, which is `/app` in the container. Explicit
+`messenger.template_files` paths have the highest priority. Missing files use
+packaged defaults; empty files are accepted and other read errors are raised.
+Thread templates are cached, so restart IMPulse after changing them. Existing
+Docker/Helm mounts into those directories continue to override the defaults.
+
 ## Local development
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and keep

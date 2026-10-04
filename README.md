@@ -14,6 +14,9 @@ Python 3.10 or newer is required. All providers use the version 1 contract
 from `impulse_messenger_api`, supplied by `impulse-bot==3.8.0`, and register
 through the `impulse.messengers` entry-point group. Installing a provider makes
 it available to IMPulse; select it with the existing `messenger.type` setting.
+IMPulse imports and validates only the provider selected by `messenger.type`;
+other installed providers stay unloaded. Restart after installing/removing
+libraries or changing messenger type.
 The `none` provider remains in IMPulse and needs no messenger library.
 
 ## Release versions
@@ -87,6 +90,8 @@ matching release versions and exact core dependency pins, isolated discovery,
 configuration, `python -I -m main --check`, bundled static/Jira
 resources, all provider templates, delivery through the real core facade with a
 fake HTTP transport, malformed callbacks, response cleanup and provider removal.
+With all three libraries installed together, fresh processes also check that
+only the configured provider is imported; `none` imports no external provider.
 It uses no messenger accounts or live provider requests. Logs and artifacts remain
 on failure; `--keep-artifacts` also preserves successful evidence.
 

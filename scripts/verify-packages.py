@@ -18,6 +18,10 @@ from zipfile import ZipFile
 
 
 PROVIDERS = ('slack', 'mattermost', 'telegram')
+FIXTURE_SECRETS = {
+    'SLACK_BOT_USER_OAUTH_TOKEN': 'fixture-token', 'SLACK_VERIFICATION_TOKEN': 'fixture-verification',
+    'MATTERMOST_ACCESS_TOKEN': 'fixture-token', 'TELEGRAM_BOT_TOKEN': 'fixture-token',
+}
 REPOSITORY = Path(__file__).resolve().parents[1]
 
 
@@ -86,6 +90,23 @@ def probe(provider_id):
 
     if provider_id != 'none':
         asyncio.run(probe_provider(provider_id, registry))
+
+
+def probe_selection(provider_id):
+    from importlib.metadata import entry_points
+    from app.config.validation import validate_config
+    from app.im.helpers import get_application
+
+    assert {entry.name for entry in entry_points(group='impulse.messengers')} == set(PROVIDERS)
+    config = validate_config(configuration(provider_id)).messenger
+    os.environ.update(FIXTURE_SECRETS)
+    channel_id = 'default' if provider_id == 'none' else config.channels['default'].id
+    app = get_application(config, {'default': {'id': channel_id}}, 'default')
+    assert app.type == app.provider.descriptor.provider_id == provider_id
+    installed_module('main')
+    loaded = {provider for provider in PROVIDERS if f'impulse_{provider}' in sys.modules}
+    expected = set() if provider_id == 'none' else {provider_id}
+    assert loaded == expected, f'{provider_id} startup imported unexpected providers: {loaded}'
 
 
 class FakeResponse:
@@ -188,11 +209,7 @@ async def probe_provider(provider_id, registry):
     else:
         raise AssertionError('Provider accepted missing credentials')
 
-    fixtures = {
-        'SLACK_BOT_USER_OAUTH_TOKEN': 'fixture-token', 'SLACK_VERIFICATION_TOKEN': 'fixture-verification',
-        'MATTERMOST_ACCESS_TOKEN': 'fixture-token', 'TELEGRAM_BOT_TOKEN': 'fixture-token',
-    }
-    os.environ.update(fixtures)
+    os.environ.update(FIXTURE_SECRETS)
     app = get_application(config, {'default': {'id': config.channels['default'].id}}, 'default')
     assert type(app) is Application and type(app.provider) is registration.factory
     transport = FakeTransport(provider_id)
@@ -320,6 +337,13 @@ def verify(uv, core, keep_artifacts):
                 run([str(python), '-I', script, '--probe', 'none'])
             print(f'PASS {provider_id}: isolated discovery, config, CLI, resources'
                   + (', fake facade lifecycle, uninstall' if provider_id != 'none' else ''), flush=True)
+
+        python = temporary / 'none' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+        run([uv, 'pip', 'install', '--python', str(python), *(str(wheels[f'impulse_{provider}']) for provider in PROVIDERS)])
+        for provider_id in ('none', *PROVIDERS):
+            config_file.write_text(json.dumps(configuration(provider_id)), encoding='utf-8')
+            run([str(python), '-I', script, '--probe-selection', provider_id])
+            print(f'PASS {provider_id}: only the configured provider imported with all three installed', flush=True)
     except BaseException:
         print(f'Verification evidence retained at {temporary}', file=sys.stderr)
         raise
@@ -336,9 +360,12 @@ def main():
     parser.add_argument('--core', type=Path, default=REPOSITORY.parent / 'impulse', help='IMPulse checkout')
     parser.add_argument('--keep-artifacts', action='store_true', help='retain successful build artifacts and logs')
     parser.add_argument('--probe', choices=('none', *PROVIDERS), help=argparse.SUPPRESS)
+    parser.add_argument('--probe-selection', choices=('none', *PROVIDERS), help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.probe:
         probe(args.probe)
+    elif args.probe_selection:
+        probe_selection(args.probe_selection)
     else:
         verify(args.uv, args.core.resolve(), args.keep_artifacts)
 

@@ -1,7 +1,10 @@
 """Telegram wire protocol, payloads and packaged templates."""
+import asyncio
 import json
 import logging
 from importlib.resources import files
+
+from aiohttp import ClientConnectionError
 
 from impulse_messenger_api import (
     DeliveryResult, GroupProfile, IncidentPresentation, Interaction, InteractionAction,
@@ -61,6 +64,13 @@ class TelegramProvider:
     async def _read_json(response):
         try:
             return await response.json()
+        except asyncio.TimeoutError:
+            raise asyncio.TimeoutError(f'Telegram response timed out (HTTP {response.status})') from None
+        except ClientConnectionError:
+            raise ClientConnectionError(f'Telegram response connection failed (HTTP {response.status})') from None
+        except Exception:
+            # Decoder errors can include the bot token in the request URL.
+            raise ValueError(f'Telegram returned invalid JSON (HTTP {response.status})') from None
         finally:
             response.close()
 

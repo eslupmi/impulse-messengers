@@ -117,10 +117,18 @@ class SlackProvider:
         response = await self.http.post(f'{self.url}/api/chat.postMessage', headers=self.headers,
             json={'channel': message.channel_id, 'thread_ts': message.thread_id, 'text': text,
                   'unfurl_links': False, 'unfurl_media': False})
-        try:
-            return DeliveryResult(response.status)
-        finally:
+        status = response.status
+        if not 200 <= status < 300:
             response.close()
+            return DeliveryResult(status)
+        try:
+            data = await self._read_json(response)
+        except Exception:
+            data = None
+        if isinstance(data, dict) and data.get('ok') is True:
+            return DeliveryResult(status)
+        logger.error('Notification delivery failed', extra={'messenger': 'slack', 'status': status})
+        return DeliveryResult(502)
 
     @staticmethod
     def incident_url(message: MessageRef, identity: ProviderIdentity) -> str:

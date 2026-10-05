@@ -229,8 +229,10 @@ class TelegramProvider:
             action = callback['data']
             if not isinstance(callback_id, str) or not callback_id or not isinstance(thread, int) or not isinstance(message, int) or not isinstance(actor, int) or not isinstance(action, str):
                 raise ValueError('invalid callback')
-            if action in ('start_chain', 'stop_chain'):
-                command = InteractionCommand(InteractionAction.TOGGLE_ASSIGNMENT)
+            if action == 'stop_chain':
+                command = InteractionCommand(InteractionAction.ASSIGN)
+            elif action == 'start_chain':
+                command = InteractionCommand(InteractionAction.RELEASE)
             elif action == 'task':
                 command = InteractionCommand(InteractionAction.CREATE_TASK)
             elif action == 'freeze_menu':

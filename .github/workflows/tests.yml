@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
     - main
+    - develop
     types:
     - opened
     - synchronize
@@ -22,4 +23,4 @@ jobs:
     if: github.event.pull_request.draft == false
     uses: ./.github/workflows/_tests.yml
     with:
-      python-versions: '["3.10","3.11","3.12","3.13"]'
+      python-versions: ${{ github.base_ref == 'main' && '["3.10","3.11","3.12","3.13"]' || '["3.12"]' }}

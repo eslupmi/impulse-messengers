@@ -12,7 +12,6 @@ class TelegramUser(BaseUser):
 
 class TelegramChannel(BaseUser):
     id: int = Field(..., description='Channel ID')
-    name: str | None = Field(None, description='Channel name')
 
 
 class TelegramApplicationConfig(BaseApplicationConfig):

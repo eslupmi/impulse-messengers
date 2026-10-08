@@ -1,0 +1,44 @@
+name: _tests
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        type: string
+        default: self-hosted
+      python-versions:
+        type: string
+        default: '["3.12"]'
+
+jobs:
+  tests:
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          path: impulse-messengers
+      - name: Checkout IMPulse
+        uses: actions/checkout@v5
+        with:
+          repository: eslupmi/impulse
+          ref: messenger-split
+          path: impulse
+      - name: Run tests
+        timeout-minutes: 10
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace:ro,Z" \
+            -e PYTHONPATH=/tmp/workspace/impulse \
+            -w /tmp/workspace/impulse-messengers \
+            python:${{ matrix.python-version }}-slim \
+            sh -c "
+              cp -a /workspace /tmp/workspace && \
+              chmod -R u+w /tmp/workspace && \
+              python -m venv /tmp/venv && \
+              /tmp/venv/bin/pip install -e packages/impulse-slack -e packages/impulse-mattermost -e packages/impulse-telegram && \
+              /tmp/venv/bin/python -m unittest discover -s tests -v
+            "

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
-dependencies = ["impulse-bot>=3.8.0", "pydantic~=2.11.7", "aiohttp~=3.13.3"]
+dependencies = ["pydantic~=2.11.7", "aiohttp~=3.13.3"]
 
 [project.entry-points."impulse.messengers"]
 mattermost = "impulse_mattermost.plugin:plugin"

@@ -1,8 +1,8 @@
 [project]
 name = "impulse-messengers-workspace"
 version = "3.8.0"
-description = "Development workspace for the IMPulse messenger libraries"
-requires-python = ">=3.10"
+description = "IMPulse messenger libraries"
+requires-python = ">=3.10,<3.14"
 dependencies = []
 
 [dependency-groups]
@@ -14,8 +14,13 @@ test = [
     "pytest-xdist~=3.6.0",
     "pytest-aiohttp~=1.0.5",
 ]
-lint = ["ruff==0.16.10"]
-dev = [{include-group = "test"}, {include-group = "lint"}]
+lint = [
+    "ruff==0.16.10"
+]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"}
+]
 
 [tool.uv]
 package = false

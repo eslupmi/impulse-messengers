@@ -413,8 +413,8 @@ def verify(uv, core, keep_artifacts):
             if name != 'impulse_bot':
                 core_requirements = [requirement for requirement in metadata.get_all('Requires-Dist', [])
                                      if requirement.startswith('impulse-bot')]
-                assert core_requirements == [f'impulse-bot=={core_version}'], (
-                    f'{name} must pin its matching core release: {core_requirements}'
+                assert core_requirements == [f'impulse-bot>={core_version}'], (
+                    f'{name} must require at least its matching core release: {core_requirements}'
                 )
         print(f'PASS four independent sdists rebuilt into wheels at release {core_version}', flush=True)
 

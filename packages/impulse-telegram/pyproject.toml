@@ -7,10 +7,10 @@ name = "impulse-telegram"
 version = "3.8.0"
 description = "Telegram messenger provider for IMPulse"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
-dependencies = ["impulse-bot==3.8.0", "pydantic~=2.11.7", "PyJWT[crypto]~=2.10.1"]
+dependencies = ["impulse-bot>=3.8.0", "pydantic~=2.11.7", "PyJWT[crypto]~=2.10.1"]
 
 [project.entry-points."impulse.messengers"]
 telegram = "impulse_telegram.plugin:plugin"

@@ -1,0 +1,26 @@
+name: tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+    - main
+    - develop
+    types:
+    - opened
+    - synchronize
+    - reopened
+    - ready_for_review
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    if: github.event.pull_request.draft == false
+    uses: ./.github/workflows/_tests.yml
+    with:
+      python-versions: ${{ github.base_ref == 'main' && '["3.10","3.11","3.12","3.13"]' || '["3.12"]' }}

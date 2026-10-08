@@ -58,11 +58,14 @@ class SlackProvider:
     async def fetch_user(self, user_id: str | int) -> UserProfile:
         response = await self.http.get(
             f'{self.url}/api/users.info', params={'user': user_id}, headers=self.headers)
-        if response.status != 200:
+        status = response.status
+        if status != 200:
             response.close()
+            logger.warning('User details fetch failed', extra={'user_id': user_id, 'status': status})
             return UserProfile(id=user_id, exists=False)
         data = await self._read_json(response)
         if not data.get('ok'):
+            logger.warning('Slack API error', extra={'user_id': user_id, 'status': status})
             return UserProfile(id=user_id, exists=False)
         user = data.get('user', {})
         profile = user.get('profile', {})
@@ -71,11 +74,14 @@ class SlackProvider:
 
     async def fetch_groups(self) -> tuple[GroupProfile, ...]:
         response = await self.http.get(f'{self.url}/api/usergroups.list', headers=self.headers)
-        if response.status != 200:
+        status = response.status
+        if status != 200:
             response.close()
+            logger.warning('Group details fetch failed', extra={'status': status})
             return ()
         data = await self._read_json(response)
         if not data.get('ok'):
+            logger.warning('Slack API error', extra={'status': status})
             return ()
         return tuple(GroupProfile(id=group['id'], name=group.get('name'))
                      for group in data.get('usergroups', []) if group.get('id'))

@@ -2,7 +2,7 @@
 name = "impulse-messengers-workspace"
 version = "3.8.0"
 description = "IMPulse messenger libraries"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = []
 
 [dependency-groups]

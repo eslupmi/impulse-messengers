@@ -1,0 +1,45 @@
+name: _tests
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        type: string
+        default: blacksmith-4vcpu-ubuntu-2204
+      python-versions:
+        type: string
+        default: '["3.12"]'
+
+jobs:
+  tests:
+    runs-on: ${{ inputs.runs-on }}
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+    steps:
+      - name: Checkout IMPulse
+        uses: actions/checkout@v5
+        with:
+          repository: eslupmi/impulse
+          ref: messenger-split
+          path: .
+      
+      - name: Create config from none example
+        run: |
+          cp examples/impulse.none.yml impulse.yml
+
+      - name: Run tests
+        timeout-minutes: 10
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/app:Z" \
+            -e DATA_PATH=/data \
+            -e UV_CACHE_DIR=/tmp/uv-cache \
+            -w /app \
+            --entrypoint sh \
+            ghcr.io/astral-sh/uv:python${{ matrix.python-version }}-bookworm-slim \
+            -c "
+              uv venv /tmp/venv && \
+              uv pip install --python /tmp/venv -r requirements.txt -r tests.requirements.txt && \
+              /tmp/venv/bin/python -m pytest tests/ --color=yes -v
+            "

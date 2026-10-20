@@ -21,4 +21,4 @@ permissions:
 jobs:
   tests:
     if: github.event.pull_request.draft == false
-    uses: ./.github/workflows/_tests.yml
+    uses: eslupmi/ci-templates/.github/workflows/_unit_tests.yml@develop

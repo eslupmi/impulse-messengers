@@ -28,7 +28,7 @@ uv build --package impulse-teams
 
 ## Verify
 
-CI installs these libraries and runs the test suite from the IMPulse core repository.
+Run integration and regression tests from the IMPulse core repository.
 Keep provider-specific validation checks temporary and outside this repository.
 
 ```sh

@@ -28,14 +28,13 @@ uv build --package impulse-teams
 
 ## Verify
 
-Keep the IMPulse source checkout in `../impulse`, so the tests exercise its public API and registry:
+CI installs these libraries and runs the test suite from the IMPulse core repository.
+Keep provider-specific validation checks temporary and outside this repository.
 
 ```sh
 uv sync --all-packages --group dev
-uv pip install -r ../impulse/requirements.txt
-uv run --no-sync pytest tests/
-uv run --no-sync ruff check packages/ tests/
+uv run --no-sync ruff check packages/
 ```
 
-The provider tests use mocked HTTP responses. Live bot installation, permissions, message rendering,
+Temporary provider checks use mocked HTTP responses. Live bot installation, permissions, message rendering,
 notifications, button delivery and OAuth login must also be checked in each target workspace.

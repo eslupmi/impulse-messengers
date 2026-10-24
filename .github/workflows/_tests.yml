@@ -47,6 +47,5 @@ jobs:
               uv venv /tmp/venv && \
               uv pip install --python /tmp/venv -r requirements.txt -r tests.requirements.txt && \
               uv pip install --python /tmp/venv --no-deps /workspace/impulse-messengers/packages/* && \
-              /tmp/venv/bin/python -m pytest /workspace/impulse-messengers/tests/ --color=yes -v && \
               /tmp/venv/bin/python -m pytest tests/ --color=yes -v
             "

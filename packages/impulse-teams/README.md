@@ -109,7 +109,7 @@ python -m pip install ./packages/impulse-teams
   Service URLs supplied by callbacks never become arbitrary outbound request destinations.
 - Bot card/message size and throttling limits still apply; oversized messages are not split automatically.
 - This package must be installed in the IMPulse environment to enable `type: teams`.
-  Tests exercise real JWT verification and mocked REST calls; a tenant installation and live Teams workflow
+  Temporary development checks exercised real JWT verification and mocked REST calls; a tenant installation and live Teams workflow
   still need deployment verification.
 
 Official references:

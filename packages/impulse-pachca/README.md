@@ -89,4 +89,4 @@ python -m pip install ./packages/impulse-pachca
 - Pachca documents group mentions as `@` followed by a tag name without spaces; the plugin does not guess an encoding for tags containing spaces.
 - Pachca enforces per-recipient and global delivery rate limits, plus a rolling daily message quota per chat. The provider uses IMPulse's existing queue and reports API failures; it adds no separate retry service. See [API limits](https://dev.pachca.com/api/limits).
 - OAuth state, login sessions and the configured-user allowlist remain owned by IMPulse. The plugin uses the documented confidential-client flow; PKCE is recommended by Pachca but requires state beyond the existing authentication contract.
-- Verification uses mocked HTTP responses and signed callback fixtures. Live Pachca delivery, button rendering and OAuth login still need a bot and workspace credentials.
+- Development validation used temporary checks with mocked HTTP responses and signed callbacks. Live Pachca delivery, button rendering and OAuth login still need a bot and workspace credentials.

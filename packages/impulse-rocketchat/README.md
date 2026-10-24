@@ -138,4 +138,4 @@ python -m pip install ./packages/impulse-rocketchat
 - Universal incident links use the documented [room deep link](https://developer.rocket.chat/docs/deep-linking) and the `mid`
   parameter used by Rocket.Chat's own [notification links](https://github.com/RocketChat/Rocket.Chat/blob/1826a86264c14ebb8b6130a5b89ed8fc37cb2ef9/apps/meteor/server/lib/notifications/message/email.js).
   Browser/mobile navigation, attachment rendering, workspace permissions, OAuth consent, and real notification delivery still
-  need verification against your Rocket.Chat deployment. Local transport tests do not establish live workspace compatibility.
+  need verification against your Rocket.Chat deployment. Temporary transport checks do not establish live workspace compatibility.

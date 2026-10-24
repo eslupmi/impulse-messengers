@@ -1,5 +1,6 @@
 import ast
 from importlib import import_module
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -86,6 +87,9 @@ async def test_core_facade_initializes_creates_updates_and_notifies(provider_id,
             data = {'keys': []}
         elif url.endswith('/chat.sendMessage'):
             data = {'success': True, 'message': {'_id': kwargs['json']['message']['_id']}}
+        elif url.endswith('/method.call/updateMessage'):
+            call = json.loads(kwargs['json']['message'])
+            data = {'success': True, 'message': json.dumps({'msg': 'result', 'id': call['id']})}
         else:
             data = {'success': True, 'data': {'id': 123}, 'id': 'conversation', 'activityId': 'activity'}
         reply = response(data)

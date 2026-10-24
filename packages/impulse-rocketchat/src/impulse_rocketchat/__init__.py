@@ -22,8 +22,19 @@ CALLBACK_MAX_AGE_SECONDS = 300
 COMMANDS = {
     'chain': InteractionCommand(InteractionAction.TOGGLE_ASSIGNMENT),
     'task': InteractionCommand(InteractionAction.CREATE_TASK),
+    'freeze_menu': InteractionCommand(InteractionAction.SHOW_FREEZE_OPTIONS),
+    'freeze_back': InteractionCommand(InteractionAction.NOOP),
+    'noop': InteractionCommand(InteractionAction.NOOP),
     'unfreeze': InteractionCommand(InteractionAction.UNFREEZE),
+    'freeze_tomorrow': InteractionCommand(InteractionAction.FREEZE, 'tomorrow'),
+    'freeze_next_monday': InteractionCommand(InteractionAction.FREEZE, 'next_monday'),
+    'freeze_month': InteractionCommand(InteractionAction.FREEZE, 'month'),
+    'freeze_6months': InteractionCommand(InteractionAction.FREEZE, '6months'),
 }
+FREEZE_OPTIONS = (
+    ('Tomorrow', 'freeze_tomorrow'), ('Next Monday', 'freeze_next_monday'),
+    ('In Month', 'freeze_month'), ('In 6 months', 'freeze_6months'), ('« Back', 'freeze_back'),
+)
 TEMPLATE_NAMES = frozenset(REQUIRED_TEMPLATE_NAMES)
 
 
@@ -40,7 +51,6 @@ class RocketChatProvider:
             if not value:
                 raise ValueError(f'{name} is required')
         self.url = config.address.rstrip('/')
-        self.impulse_address = config.impulse_address
         self.team = None
         self._channels = frozenset(channel.id for channel in config.channels.values())
         self._groups = tuple(group.id for group in config.groups.values())
@@ -103,17 +113,28 @@ class RocketChatProvider:
             text += f'\nFrozen until {message.frozen_until_text or message.frozen_until}'
         return text
 
-    def _actions(self, message: IncidentPresentation, message_id: str):
+    @staticmethod
+    def _actions(message: IncidentPresentation, message_id: str, *, freeze_menu=False):
         if message.status == 'closed':
             return []
-        labels = [('Take It / Release', 'chain'), ('Unfreeze', 'unfreeze')]
-        if message.can_create_task and not message.task_link:
-            labels.append(('Create Task', 'task'))
-        # shortcut: REST chat.update cannot edit attachment buttons, revisit with an Apps-Engine integration.
+        if freeze_menu and not message.frozen:
+            labels = FREEZE_OPTIONS
+        else:
+            if message.frozen_by_maintenance:
+                freeze = ('Maintenance', 'noop')
+            elif message.frozen_by_inhibition:
+                freeze = ('Inhibited', 'noop')
+            elif message.can_unfreeze:
+                freeze = (message.frozen_until_text or 'Unfreeze', 'unfreeze')
+            elif message.frozen:
+                freeze = (message.frozen_until_text or 'Frozen', 'noop')
+            else:
+                freeze = ('Freeze', 'freeze_menu')
+            labels = [('Take It / Release', 'chain'), freeze]
+            if message.can_create_task and not message.task_link:
+                labels.append(('Create Task', 'task'))
         return [{'type': 'button', 'text': text, 'msg': f'{COMMAND_PREFIX} {message_id} {action}',
-                 'msg_in_chat_window': True, 'msg_processing_type': 'sendMessage'} for text, action in labels] + [
-                    {'type': 'button', 'text': 'Freeze in IMPulse', 'url': self.impulse_address},
-                ]
+                 'msg_in_chat_window': True, 'msg_processing_type': 'sendMessage'} for text, action in labels]
 
     async def create_incident(self, message: IncidentPresentation) -> MessageRef | None:
         message_id = uuid4().hex
@@ -133,15 +154,34 @@ class RocketChatProvider:
         logger.error('Incident message creation failed', extra={'messenger': 'rocketchat', 'status': status})
         return None
 
-    async def update_incident(self, message: IncidentPresentation) -> None:
-        response = await self.http.post(f'{self.url}/api/v1/chat.update', headers=self.headers, json={
-            'roomId': message.channel_id, 'msgId': message.thread_id, 'text': self._content(message),
+    async def update_incident(self, message: IncidentPresentation, *, freeze_menu=False) -> None:
+        text = self._content(message)
+        show_menu = freeze_menu and not message.frozen and message.status != 'closed'
+        if show_menu:
+            text += '\nChoose freeze duration'
+        request_id = uuid4().hex
+        # An explicit preview list forces native updateMessage to apply button-only edits.
+        response = await self.http.post(f'{self.url}/api/v1/method.call/updateMessage', headers=self.headers, json={
+            'message': json.dumps({'msg': 'method', 'method': 'updateMessage', 'id': request_id, 'params': [{
+                '_id': message.thread_id, 'rid': message.channel_id, 'msg': text,
+                'attachments': [{'actions': self._actions(message, message.thread_id, freeze_menu=show_menu),
+                                 'button_alignment': 'vertical' if show_menu else 'horizontal'}],
+            }, []]}),
         })
         status = response.status
         if not 200 <= status < 300:
             response.close()
-            raise RuntimeError(f'Rocket.Chat incident update failed (HTTP {status})')
-        if not (await self._read(response)).get('success'):
+            raise RuntimeError(f'Rocket.Chat incident update failed (HTTP {status}); '
+                               'check native updateMessage support and bot editing permissions')
+        try:
+            data = await self._read(response)
+            result = json.loads(data['message'])
+            valid = (data.get('success') is True and isinstance(result, dict)
+                     and result.get('msg') == 'result' and result.get('id') == request_id
+                     and result.get('error') is None)
+        except (ValueError, KeyError, TypeError):
+            valid = False
+        if not valid:
             raise RuntimeError('Rocket.Chat incident update failed')
 
     async def post_notification(self, message: MessageRef, content: NotificationContent) -> DeliveryResult:
@@ -178,12 +218,30 @@ class RocketChatProvider:
             prefix, message_id, action = payload['text'].split()
             if prefix != COMMAND_PREFIX or not message_id or action not in COMMANDS:
                 raise ValueError('invalid command')
-            return Interaction(MessageRef(channel_id, message_id), actor_id, (COMMANDS[action],))
+            command = COMMANDS[action]
+            if command.action == InteractionAction.FREEZE:
+                response = await self.http.get(f'{self.url}/api/v1/chat.getMessage', headers=self.headers,
+                                               params={'msgId': message_id})
+                if response.status != 200:
+                    response.close()
+                    return ProviderResponse(status_code=503)
+                data = await self._read(response)
+                original = data['message']
+                if (data.get('success') is not True or original['_id'] != message_id or original['rid'] != channel_id
+                        or original['u']['_id'] != self.headers['X-User-Id']):
+                    return ProviderResponse(status_code=400)
+                # Commands are visible: accept durations only while their menu is still rendered.
+                if not any(button.get('msg') == f'{COMMAND_PREFIX} {message_id} {action}'
+                           for attachment in original.get('attachments', [])
+                           for button in attachment.get('actions', [])):
+                    return ProviderResponse()
+            return Interaction(MessageRef(channel_id, message_id), actor_id, (command,))
         except (json.JSONDecodeError, UnicodeDecodeError, KeyError, ValueError, TypeError, AttributeError, OverflowError):
             return ProviderResponse(status_code=400)
 
     async def after_interaction(self, message: IncidentPresentation, interaction: Interaction) -> None:
-        await self.update_incident(message)
+        freeze_menu = any(command.action == InteractionAction.SHOW_FREEZE_OPTIONS for command in interaction.commands)
+        await self.update_incident(message, freeze_menu=freeze_menu)
 
     @staticmethod
     def respond_to_interaction(message: IncidentPresentation) -> ProviderResponse:

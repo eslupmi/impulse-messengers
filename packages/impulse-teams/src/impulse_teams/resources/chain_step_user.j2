@@ -1,0 +1,5 @@
+{%- set user = users.get(step.value) -%}
+🔔 user **{{ step.value -}}**
+{%- if user.exists %} (<at>{{ user.id }}</at>)
+{%- else %} ([NotFound](https://docs.impulse.bot/stable/warnings/NotFound/))  |  🔔 admins ({%- for u in users.values() if u and 'admin' in u.roles %}<at>{{ u.id }}</at>{% if not loop.last %},{% endif %}{% endfor -%})
+{%- endif -%}

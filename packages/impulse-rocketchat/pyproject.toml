@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "impulse-rocketchat"
+version = "3.8.0"
+description = "Rocket.Chat messenger provider for IMPulse"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "GPL-3.0-only"
+license-files = ["LICENSE.md"]
+dependencies = ["pydantic~=2.11.7"]
+
+[project.entry-points."impulse.messengers"]
+rocketchat = "impulse_rocketchat.plugin:plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+impulse_rocketchat = ["resources/*.j2", "py.typed"]

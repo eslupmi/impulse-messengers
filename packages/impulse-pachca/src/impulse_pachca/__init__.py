@@ -166,13 +166,21 @@ class PachcaProvider:
             return ProviderResponse(status_code=401)
         try:
             payload = json.loads(request.body)
-            if abs(time.time() - payload['webhook_timestamp']) > WEBHOOK_MAX_AGE_SECONDS:
+            if not isinstance(payload, dict):
+                return ProviderResponse(status_code=400)
+            timestamp = payload['webhook_timestamp']
+            if type(timestamp) not in (int, float):
+                return ProviderResponse(status_code=400)
+            now = time.time()
+            if not now - WEBHOOK_MAX_AGE_SECONDS <= timestamp <= now + WEBHOOK_MAX_AGE_SECONDS:
                 return ProviderResponse(status_code=401)
             if payload.get('type') != 'button':
                 return ProviderResponse()
+            if any(type(payload[key]) is not int or payload[key] <= 0 for key in ('chat_id', 'message_id', 'user_id')):
+                return ProviderResponse(status_code=400)
             return Interaction(MessageRef(payload['chat_id'], str(payload['message_id'])), payload['user_id'],
                                (COMMANDS[payload['data']],))
-        except (json.JSONDecodeError, KeyError, TypeError):
+        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError):
             return ProviderResponse(status_code=400)
 
     async def after_interaction(self, message: IncidentPresentation, interaction: Interaction) -> None:

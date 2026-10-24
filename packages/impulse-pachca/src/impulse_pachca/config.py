@@ -6,15 +6,15 @@ from impulse_messenger_api import BaseApplicationConfig, BaseUser
 
 
 class PachcaUser(BaseUser):
-    id: int = Field(..., description='User ID')
+    id: int = Field(..., gt=0, description='User ID')
 
 
 class PachcaChannel(BaseModel):
-    id: int = Field(..., description='Chat ID')
+    id: int = Field(..., gt=0, description='Chat ID')
 
 
 class PachcaGroup(BaseModel):
-    id: int = Field(..., description='Group tag ID')
+    id: int = Field(..., gt=0, description='Group tag ID')
 
 
 class PachcaApplicationConfig(BaseApplicationConfig):

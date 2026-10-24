@@ -1,0 +1,5 @@
+{%- set group = groups.get(step.value) -%}
+🔔 group **{{ step.value }}**
+{%- if not group.exists %} ([NotFound](https://docs.impulse.bot/stable/warnings/NotFound/))  |  🔔 admins ({%- for u in users.values() if u and 'admin' in u.roles %}<at>{{ u.id }}</at>{% if not loop.last %},{% endif %}{% endfor -%})
+{%- else %} (@{{ group.name }})
+{%- endif -%}

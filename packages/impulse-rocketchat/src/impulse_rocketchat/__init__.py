@@ -152,10 +152,11 @@ class RocketChatProvider:
         color = STATUS_COLORS.get('frozen' if message.frozen else message.status)
         body = RocketChatProvider._body(message)
         actions = RocketChatProvider._actions(message, message_id, freeze_menu=freeze_menu)
+        fields = [{'value': body}]
         if freeze_menu and not message.frozen and message.status != 'closed':
-            return [{'text': body, 'color': color, 'actions': actions[:3], 'button_alignment': 'horizontal'},
+            return [{'color': color, 'fields': fields, 'actions': actions[:3], 'button_alignment': 'horizontal'},
                     {'color': color, 'actions': actions[3:], 'button_alignment': 'horizontal'}]
-        attachment = {'text': body, 'color': color}
+        attachment = {'color': color, 'fields': fields}
         if actions:
             attachment['actions'] = actions
             attachment['button_alignment'] = 'horizontal'

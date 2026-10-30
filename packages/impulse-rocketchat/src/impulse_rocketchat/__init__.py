@@ -126,24 +126,26 @@ class RocketChatProvider:
         if message.status == 'closed':
             return []
         if freeze_menu and not message.frozen:
-            labels = FREEZE_OPTIONS
+            labels = [(text, action, 'secondary') for text, action in FREEZE_OPTIONS]
         else:
             if message.frozen_by_maintenance:
-                freeze = ('Maintenance', 'noop')
+                freeze = ('Maintenance', 'noop', 'secondary')
             elif message.frozen_by_inhibition:
-                freeze = ('Inhibited', 'noop')
+                freeze = ('Inhibited', 'noop', 'secondary')
             elif message.can_unfreeze:
-                freeze = (message.frozen_until_text or 'Unfreeze', 'unfreeze')
+                freeze = (message.frozen_until_text or 'Unfreeze', 'unfreeze', 'success')
             elif message.frozen:
-                freeze = (message.frozen_until_text or 'Frozen', 'noop')
+                freeze = (message.frozen_until_text or 'Frozen', 'noop', 'secondary')
             else:
-                freeze = ('Freeze', 'freeze_menu')
+                freeze = ('Freeze', 'freeze_menu', 'secondary')
             chain = 'Release' if not message.chain_enabled and message.status == 'resolved' else 'Take It'
-            labels = [(chain, 'chain'), freeze]
+            chain_style = 'secondary' if message.frozen_by_inhibition or not message.chain_enabled and message.status != 'resolved' else 'success'
+            labels = [(chain, 'chain', chain_style), freeze]
             if message.can_create_task and not message.task_link:
-                labels.append(('Create Task', 'task'))
+                labels.append(('Create Task', 'task', 'secondary'))
         return [{'type': 'button', 'text': text, 'msg': f'{COMMAND_PREFIX} {message_id} {action}',
-                 'msg_in_chat_window': True, 'msg_processing_type': 'sendMessage'} for text, action in labels]
+                 'msg_in_chat_window': True, 'msg_processing_type': 'sendMessage', 'style': style}
+                for text, action, style in labels]
 
     @staticmethod
     def _attachments(message: IncidentPresentation, message_id: str, *, freeze_menu=False):

@@ -35,6 +35,10 @@ FREEZE_OPTIONS = (
     ('Tomorrow', 'freeze_tomorrow'), ('Next Monday', 'freeze_next_monday'),
     ('In Month', 'freeze_month'), ('In 6 months', 'freeze_6months'), ('« Back', 'freeze_back'),
 )
+STATUS_COLORS = {
+    'firing': '#f61f1f', 'unknown': '#c1a300', 'resolved': '#56c15e',
+    'closed': '#969696', 'deleted': '#969696', 'frozen': '#38ade6',
+}
 TEMPLATE_NAMES = frozenset(REQUIRED_TEMPLATE_NAMES)
 
 
@@ -103,8 +107,12 @@ class RocketChatProvider:
         return tuple(profiles)
 
     @staticmethod
-    def _content(message: IncidentPresentation) -> str:
-        text = f'{message.status_icon} {message.header}\n{message.body}'
+    def _header(message: IncidentPresentation) -> str:
+        return f'{message.status_icon} {message.header}'
+
+    @staticmethod
+    def _body(message: IncidentPresentation) -> str:
+        text = message.body
         if message.frozen_by_maintenance:
             text += '\nMaintenance'
         elif message.frozen_by_inhibition:
@@ -137,12 +145,25 @@ class RocketChatProvider:
         return [{'type': 'button', 'text': text, 'msg': f'{COMMAND_PREFIX} {message_id} {action}',
                  'msg_in_chat_window': True, 'msg_processing_type': 'sendMessage'} for text, action in labels]
 
+    @staticmethod
+    def _attachments(message: IncidentPresentation, message_id: str, *, freeze_menu=False):
+        color = STATUS_COLORS.get('frozen' if message.frozen else message.status)
+        body = RocketChatProvider._body(message)
+        actions = RocketChatProvider._actions(message, message_id, freeze_menu=freeze_menu)
+        if freeze_menu and not message.frozen and message.status != 'closed':
+            return [{'text': body, 'color': color, 'actions': actions[:3], 'button_alignment': 'horizontal'},
+                    {'color': color, 'actions': actions[3:], 'button_alignment': 'horizontal'}]
+        attachment = {'text': body, 'color': color}
+        if actions:
+            attachment['actions'] = actions
+            attachment['button_alignment'] = 'horizontal'
+        return [attachment]
+
     async def create_incident(self, message: IncidentPresentation) -> MessageRef | None:
         message_id = uuid4().hex
         response = await self.http.post(f'{self.url}/api/v1/chat.sendMessage', headers=self.headers, json={
-            'message': {'_id': message_id, 'rid': message.channel_id, 'msg': self._content(message),
-                        'attachments': [{'actions': self._actions(message, message_id),
-                                         'button_alignment': 'horizontal'}]},
+            'message': {'_id': message_id, 'rid': message.channel_id, 'msg': self._header(message),
+                        'attachments': self._attachments(message, message_id)},
         })
         status = response.status
         if not 200 <= status < 300:
@@ -156,18 +177,13 @@ class RocketChatProvider:
         return None
 
     async def update_incident(self, message: IncidentPresentation, *, freeze_menu=False) -> None:
-        text = self._content(message)
         show_menu = freeze_menu and not message.frozen and message.status != 'closed'
         request_id = uuid4().hex
-        actions = self._actions(message, message.thread_id, freeze_menu=show_menu)
-        attachments = ([{'actions': actions[:3], 'button_alignment': 'horizontal'},
-                        {'actions': actions[3:], 'button_alignment': 'horizontal'}]
-                       if show_menu else [{'actions': actions, 'button_alignment': 'horizontal'}])
         # An explicit preview list forces native updateMessage to apply button-only edits.
         response = await self.http.post(f'{self.url}/api/v1/method.call/updateMessage', headers=self.headers, json={
             'message': json.dumps({'msg': 'method', 'method': 'updateMessage', 'id': request_id, 'params': [{
-                '_id': message.thread_id, 'rid': message.channel_id, 'msg': text,
-                'attachments': attachments,
+                '_id': message.thread_id, 'rid': message.channel_id, 'msg': self._header(message),
+                'attachments': self._attachments(message, message.thread_id, freeze_menu=show_menu),
             }, []]}),
         })
         status = response.status

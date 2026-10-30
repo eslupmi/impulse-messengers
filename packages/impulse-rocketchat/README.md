@@ -127,7 +127,7 @@ python -m pip install ./packages/impulse-rocketchat
 - Turning the app off leaves the buttons on existing messages, and clicks do nothing until the app is enabled again. Changing `id` in `app.json` does the same to every button already sent.
 - A click does not post `impulse <id> <action>` into the room. The app schedules that payload to `<impulse_address>/app` and returns immediately, so the button does not wait on the incident update. Typing the same command in the room does nothing. Duration choices are accepted only while that button is still on the message. IMPulse checks this with `chat.getMessage` and the button `value` in `blocks`. The read and the core action are not atomic.
 - Thread replies set `parseUrls` to `false` on `chat.postMessage`, which skips URL previews. The incident header and body live in
-the colored attachment, and the buttons live in one `actions` block. The assignee is a UI Kit link to that user's info in the same room (`members-list` in a channel or group, `user-info` in a direct message) and does not notify. Other `@mentions` in the body are display-only and do not notify. Buttons are rebuilt from
+the colored attachment, and the buttons live in one `actions` block. Assignment is shown in the body as `(*assigned to @username*)`. `@mentions` in the body are display-only and do not notify. Buttons are rebuilt from
 IMPulse's current presentation, including maintenance/inhibition and manual-unfreeze state, and removed when the
 incident closes. IMPulse continues to own incident lookup, durations and business actions.
 - Team mentions depend on Rocket.Chat's workspace features and settings. Use IMPulse `user_groups` when explicit individual

@@ -205,7 +205,7 @@ class RocketChatProvider:
     async def post_notification(self, message: MessageRef, content: NotificationContent) -> DeliveryResult:
         text = content.text if content.header is None else f'{content.header}\n{content.text}'
         response = await self.http.post(f'{self.url}/api/v1/chat.postMessage', headers=self.headers, json={
-            'roomId': message.channel_id, 'tmid': message.thread_id, 'text': text,
+            'roomId': message.channel_id, 'tmid': message.thread_id, 'text': text, 'parseUrls': False,
         })
         status = response.status
         if not 200 <= status < 300:

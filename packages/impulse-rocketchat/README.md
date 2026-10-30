@@ -11,7 +11,7 @@ deployment behavior still requires verification.
 | IMPulse function | Rocket.Chat support |
 | --- | --- |
 | Incident creation and status/body updates | REST `chat.sendMessage` and the native `updateMessage` method; the header stays in `msg`, the body and freeze status live in a status-colored attachment. IMPulse stores the root message ID. |
-| Incident notifications and escalation chains | Replies with `tmid` through `chat.postMessage`; native `@username` mentions. |
+| Incident notifications and escalation chains | Replies with `tmid` through `chat.postMessage` and `parseUrls: false`, so thread replies do not generate link previews; native `@username` mentions. |
 | Configured user groups | IMPulse expands `user_groups` into individual mentions. |
 | Messenger groups | Rocket.Chat teams, read with `teams.info` and mentioned as `@teamname`; team mentions must be enabled in the workspace. |
 | Assignment and release | **Take It** or **Release** sends an outgoing integration event; IMPulse chooses the action from current incident state. |
@@ -118,7 +118,8 @@ python -m pip install ./packages/impulse-rocketchat
   creating a future compatibility risk. Check the deployed release and release notes before upgrading, and allow the
   route through any API proxy. No Apps-Engine app is required for the source-confirmed 8.9.0 release.
 - The provider passes an empty `previewUrls` array to the native update method so attachment-only changes are applied
-  even when the text is unchanged. This disables URL previews on edited incident messages. The incident body lives in
+  even when the text is unchanged. This disables URL previews on edited incident messages. Thread replies set
+  `parseUrls` to `false` on `chat.postMessage`, which skips URL parsing and the same link previews. The incident body lives in
   the colored attachment with the buttons; `@mentions` in that body are display-only and do not notify. The freeze menu
   splits duration choices across two attachments because one attachment is one button row. Buttons are rebuilt from
   IMPulse's current presentation, including maintenance/inhibition and manual-unfreeze state, and removed when the

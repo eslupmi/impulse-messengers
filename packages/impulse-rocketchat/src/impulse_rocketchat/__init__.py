@@ -130,7 +130,8 @@ class RocketChatProvider:
                 freeze = (message.frozen_until_text or 'Frozen', 'noop')
             else:
                 freeze = ('Freeze', 'freeze_menu')
-            labels = [('Take It / Release', 'chain'), freeze]
+            chain = 'Release' if not message.chain_enabled and message.status == 'resolved' else 'Take It'
+            labels = [(chain, 'chain'), freeze]
             if message.can_create_task and not message.task_link:
                 labels.append(('Create Task', 'task'))
         return [{'type': 'button', 'text': text, 'msg': f'{COMMAND_PREFIX} {message_id} {action}',
@@ -157,15 +158,16 @@ class RocketChatProvider:
     async def update_incident(self, message: IncidentPresentation, *, freeze_menu=False) -> None:
         text = self._content(message)
         show_menu = freeze_menu and not message.frozen and message.status != 'closed'
-        if show_menu:
-            text += '\nChoose freeze duration'
         request_id = uuid4().hex
+        actions = self._actions(message, message.thread_id, freeze_menu=show_menu)
+        attachments = ([{'actions': actions[:3], 'button_alignment': 'horizontal'},
+                        {'actions': actions[3:], 'button_alignment': 'horizontal'}]
+                       if show_menu else [{'actions': actions, 'button_alignment': 'horizontal'}])
         # An explicit preview list forces native updateMessage to apply button-only edits.
         response = await self.http.post(f'{self.url}/api/v1/method.call/updateMessage', headers=self.headers, json={
             'message': json.dumps({'msg': 'method', 'method': 'updateMessage', 'id': request_id, 'params': [{
                 '_id': message.thread_id, 'rid': message.channel_id, 'msg': text,
-                'attachments': [{'actions': self._actions(message, message.thread_id, freeze_menu=show_menu),
-                                 'button_alignment': 'vertical' if show_menu else 'horizontal'}],
+                'attachments': attachments,
             }, []]}),
         })
         status = response.status

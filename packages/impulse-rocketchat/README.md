@@ -14,7 +14,7 @@ deployment behavior still requires verification.
 | Incident notifications and escalation chains | Replies with `tmid` through `chat.postMessage`; native `@username` mentions. |
 | Configured user groups | IMPulse expands `user_groups` into individual mentions. |
 | Messenger groups | Rocket.Chat teams, read with `teams.info` and mentioned as `@teamname`; team mentions must be enabled in the workspace. |
-| Assignment and release | **Take It / Release** sends an outgoing integration event; IMPulse chooses the action from current incident state. |
+| Assignment and release | **Take It** or **Release** sends an outgoing integration event; IMPulse chooses the action from current incident state. |
 | Freeze and unfreeze | **Freeze** replaces the message's buttons with **Tomorrow**, **Next Monday**, **In Month**, **In 6 months** and **Back**. Selection restores the normal controls; the frozen incident's button clears a manual freeze. |
 | Task creation | An optional **Create Task** button calls the existing IMPulse task integration. |
 | IMPulse UI login | Rocket.Chat third-party OAuth authorization code flow and authenticated `me` lookup. |
@@ -90,7 +90,7 @@ AUTH_REDIRECT_URL=https://<your_impulse_domain>/auth/callback
 ```
 
 Install `impulse-rocketchat` into the same environment as IMPulse; it registers through `impulse.messengers`.
-After startup, create a test incident, use **Take It / Release**, and confirm a notification appears in the same thread.
+After startup, create a test incident, use **Take It** or **Release**, and confirm a notification appears in the same thread.
 Click **Freeze** and confirm the same message shows the four duration choices and **Back**.
 Check that **Back** restores the normal buttons without freezing, then choose a duration.
 Use the frozen incident's button to clear the manual freeze, and check maintenance or inhibition freezes remain intact.

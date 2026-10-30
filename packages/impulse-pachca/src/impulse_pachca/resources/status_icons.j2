@@ -1,0 +1,7 @@
+{%- if incident.is_frozen -%}
+❄️
+{%- else -%}
+{%- set status = incident.status -%}
+{%- set status_emoji = {"firing": "🔥", "unknown": "⚠️", "resolved": "✅", "closed": "✖️", "deleted": "✖️"}[status] -%}
+{{- status_emoji -}}
+{%- endif -%}

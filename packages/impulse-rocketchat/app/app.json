@@ -1,0 +1,44 @@
+{
+    "id": "b7e4c1a0-9f28-4d6e-a3c5-1e8b0d7f6a42",
+    "version": "0.1.0",
+    "requiredApiVersion": "^1.67.0",
+    "author": {
+        "name": "IMPulse",
+        "homepage": "https://docs.impulse.bot",
+        "support": "https://docs.impulse.bot"
+    },
+    "name": "IMPulse",
+    "nameSlug": "impulse",
+    "classFile": "ImpulseRocketChatApp.ts",
+    "iconFile": "icon.png",
+    "description": "Colored incident buttons for IMPulse.",
+    "permissions": [
+        {
+            "name": "user.read"
+        },
+        {
+            "name": "room.read"
+        },
+        {
+            "name": "message.read"
+        },
+        {
+            "name": "message.write"
+        },
+        {
+            "name": "networking"
+        },
+        {
+            "name": "scheduler"
+        },
+        {
+            "name": "api"
+        },
+        {
+            "name": "ui.interact"
+        }
+    ],
+    "implements": [
+        "IUIKitInteractionHandler"
+    ]
+}

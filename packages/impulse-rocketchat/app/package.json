@@ -1,0 +1,11 @@
+{
+    "name": "impulse-rocketchat-app",
+    "private": true,
+    "devDependencies": {
+        "@rocket.chat/apps-cli": "^1.14.0",
+        "@rocket.chat/apps-engine": "1.67.0",
+        "@rocket.chat/ui-kit": "1.0.0",
+        "@types/node": "~24.13.2",
+        "typescript": "~5.9.3"
+    }
+}

@@ -20,6 +20,7 @@ class RocketChatGroup(BaseModel):
 class RocketChatApplicationConfig(BaseApplicationConfig):
     type: Literal['rocketchat'] = 'rocketchat'
     address: HttpBase = Field(..., description='Rocket.Chat workspace URL')
+    app_id: str = Field(..., min_length=1, description='Installed IMPulse Rocket.Chat app ID')
     channels: dict[str, RocketChatChannel]
     users: dict[str, RocketChatUser]
     groups: dict[str, RocketChatGroup] = Field(default_factory=dict)

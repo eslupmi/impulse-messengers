@@ -9,3 +9,4 @@ dist/
 htmlcov/
 .ruff_cache/
 .mypy_cache/
+packages/impulse-rocketchat/app/icon.png

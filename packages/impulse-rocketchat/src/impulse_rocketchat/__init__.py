@@ -1,11 +1,10 @@
-"""Rocket.Chat REST messages and native outgoing integration callbacks."""
+"""Rocket.Chat incident messages through the private app, and REST lookups."""
 from datetime import datetime, timezone
 import hmac
 from importlib.resources import files
 import json
 import logging
 from urllib.parse import urlencode, urlsplit
-from uuid import uuid4
 
 from impulse_messenger_api import (
     DeliveryResult, GroupProfile, IncidentPresentation, Interaction, InteractionAction,
@@ -50,11 +49,13 @@ class RocketChatProvider:
         token = secrets.get('ROCKETCHAT_AUTH_TOKEN')
         user_id = secrets.get('ROCKETCHAT_USER_ID')
         self._webhook_token = secrets.get('ROCKETCHAT_WEBHOOK_TOKEN')
+        self._app_token = secrets.get('ROCKETCHAT_APP_TOKEN')
         for name, value in (('ROCKETCHAT_AUTH_TOKEN', token), ('ROCKETCHAT_USER_ID', user_id),
-                            ('ROCKETCHAT_WEBHOOK_TOKEN', self._webhook_token)):
+                            ('ROCKETCHAT_WEBHOOK_TOKEN', self._webhook_token), ('ROCKETCHAT_APP_TOKEN', self._app_token)):
             if not value:
                 raise ValueError(f'{name} is required')
         self.url = config.address.rstrip('/')
+        self._app_id = config.app_id
         self.team = None
         self._channels = frozenset(channel.id for channel in config.channels.values())
         self._groups = tuple(group.id for group in config.groups.values())
@@ -122,7 +123,7 @@ class RocketChatProvider:
         return text
 
     @staticmethod
-    def _actions(message: IncidentPresentation, message_id: str, *, freeze_menu=False):
+    def _buttons(message: IncidentPresentation, *, freeze_menu=False):
         if message.status == 'closed':
             return []
         if freeze_menu and not message.frozen:
@@ -143,67 +144,43 @@ class RocketChatProvider:
             labels = [(chain, 'chain', chain_style), freeze]
             if message.can_create_task and not message.task_link:
                 labels.append(('Create Task', 'task', 'secondary'))
-        return [{'type': 'button', 'text': text, 'msg': f'{COMMAND_PREFIX} {message_id} {action}',
-                 'msg_in_chat_window': True, 'msg_processing_type': 'sendMessage', 'style': style}
-                for text, action, style in labels]
+        return [{'text': text, 'action': action, 'style': style} for text, action, style in labels]
 
-    @staticmethod
-    def _attachments(message: IncidentPresentation, message_id: str, *, freeze_menu=False):
-        color = STATUS_COLORS.get('frozen' if message.frozen else message.status)
-        body = RocketChatProvider._body(message)
-        actions = RocketChatProvider._actions(message, message_id, freeze_menu=freeze_menu)
-        fields = [{'value': body}]
-        if freeze_menu and not message.frozen and message.status != 'closed':
-            return [{'color': color, 'fields': fields, 'actions': actions[:3], 'button_alignment': 'horizontal'},
-                    {'color': color, 'actions': actions[3:], 'button_alignment': 'horizontal'}]
-        attachment = {'color': color, 'fields': fields}
-        if actions:
-            attachment['actions'] = actions
-            attachment['button_alignment'] = 'horizontal'
-        return [attachment]
-
-    async def create_incident(self, message: IncidentPresentation) -> MessageRef | None:
-        message_id = uuid4().hex
-        response = await self.http.post(f'{self.url}/api/v1/chat.sendMessage', headers=self.headers, json={
-            'message': {'_id': message_id, 'rid': message.channel_id, 'msg': self._header(message),
-                        'attachments': self._attachments(message, message_id)},
-        })
+    async def _render_incident(self, message: IncidentPresentation, message_id: str, *, freeze_menu=False):
+        response = await self.http.post(
+            f'{self.url}/api/apps/public/{self._app_id}/incident',
+            headers={'Content-Type': 'application/json', 'X-Impulse-Token': self._app_token},
+            json={
+                'id': message_id,
+                'roomId': message.channel_id,
+                'header': self._header(message),
+                'color': STATUS_COLORS.get('frozen' if message.frozen else message.status) or '',
+                'text': self._body(message),
+                'buttons': self._buttons(message, freeze_menu=freeze_menu and not message.frozen and message.status != 'closed'),
+            },
+        )
         status = response.status
         if not 200 <= status < 300:
             response.close()
-            logger.error('Incident message creation failed', extra={'messenger': 'rocketchat', 'status': status})
             return None
         data = await self._read(response)
-        if data.get('success') and data.get('message', {}).get('_id') == message_id:
-            return MessageRef(message.channel_id, message_id)
-        logger.error('Incident message creation failed', extra={'messenger': 'rocketchat', 'status': status})
-        return None
+        if not isinstance(data, dict):
+            return None
+        content = data.get('content')
+        if isinstance(content, dict):
+            return content.get('id')
+        return data.get('id')
+
+    async def create_incident(self, message: IncidentPresentation) -> MessageRef | None:
+        message_id = await self._render_incident(message, '')
+        if not message_id:
+            logger.error('Incident message creation failed', extra={'messenger': 'rocketchat'})
+            return None
+        return MessageRef(message.channel_id, message_id)
 
     async def update_incident(self, message: IncidentPresentation, *, freeze_menu=False) -> None:
-        show_menu = freeze_menu and not message.frozen and message.status != 'closed'
-        request_id = uuid4().hex
-        # An explicit preview list forces native updateMessage to apply button-only edits.
-        response = await self.http.post(f'{self.url}/api/v1/method.call/updateMessage', headers=self.headers, json={
-            'message': json.dumps({'msg': 'method', 'method': 'updateMessage', 'id': request_id, 'params': [{
-                '_id': message.thread_id, 'rid': message.channel_id, 'msg': self._header(message),
-                'attachments': self._attachments(message, message.thread_id, freeze_menu=show_menu),
-            }, []]}),
-        })
-        status = response.status
-        if not 200 <= status < 300:
-            response.close()
-            raise RuntimeError(f'Rocket.Chat incident update failed (HTTP {status}); '
-                               'check native updateMessage support and bot editing permissions')
-        try:
-            data = await self._read(response)
-            result = json.loads(data['message'])
-            valid = (data.get('success') is True and isinstance(result, dict)
-                     and result.get('msg') == 'result' and result.get('id') == request_id
-                     and result.get('error') is None)
-        except (ValueError, KeyError, TypeError):
-            valid = False
-        if not valid:
-            raise RuntimeError('Rocket.Chat incident update failed')
+        if not await self._render_incident(message, message.thread_id, freeze_menu=freeze_menu):
+            raise RuntimeError('Rocket.Chat incident update failed; check the IMPulse app is installed and owns this message')
 
     async def post_notification(self, message: MessageRef, content: NotificationContent) -> DeliveryResult:
         text = content.text if content.header is None else f'{content.header}\n{content.text}'
@@ -248,13 +225,12 @@ class RocketChatProvider:
                     return ProviderResponse(status_code=503)
                 data = await self._read(response)
                 original = data['message']
-                if (data.get('success') is not True or original['_id'] != message_id or original['rid'] != channel_id
-                        or original['u']['_id'] != self.headers['X-User-Id']):
+                if data.get('success') is not True or original['_id'] != message_id or original['rid'] != channel_id:
                     return ProviderResponse(status_code=400)
-                # Commands are visible: accept durations only while their menu is still rendered.
-                if not any(button.get('msg') == f'{COMMAND_PREFIX} {message_id} {action}'
-                           for attachment in original.get('attachments', [])
-                           for button in attachment.get('actions', [])):
+                expected = f'{COMMAND_PREFIX} {message_id} {action}'
+                if not any(element.get('value') == expected
+                           for block in original.get('blocks') or []
+                           for element in block.get('elements') or []):
                     return ProviderResponse()
             return Interaction(MessageRef(channel_id, message_id), actor_id, (command,))
         except (json.JSONDecodeError, UnicodeDecodeError, KeyError, ValueError, TypeError, AttributeError, OverflowError):

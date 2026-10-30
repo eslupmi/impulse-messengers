@@ -28,6 +28,8 @@ export class IncidentEndpoint extends ApiEndpoint {
         const text = String(body.text || '');
         const color = typeof body.color === 'string' ? body.color : '';
         const buttons: Button[] = Array.isArray(body.buttons) ? body.buttons : [];
+        const assignee = typeof body.assignee === 'string' ? body.assignee : '';
+        const origin = typeof body.origin === 'string' ? body.origin : '';
         const id = typeof body.id === 'string' ? body.id : '';
         if (id) {
             const message = await read.getMessageReader().getById(id);
@@ -37,11 +39,11 @@ export class IncidentEndpoint extends ApiEndpoint {
             if (message.sender.id !== appUser.id) {
                 return { status: HttpStatusCode.FORBIDDEN, content: { error: 'owner' } };
             }
-            await render(modify, appUser, room, id, header, color, text, buttons, this.app.getID());
+            await render(modify, appUser, room, id, header, color, text, buttons, assignee, origin, this.app.getID());
             return this.success({ id });
         }
         const created = await modify.getCreator().finish(draft(modify, appUser, room, header, color, text));
-        await render(modify, appUser, room, created, header, color, text, buttons, this.app.getID());
+        await render(modify, appUser, room, created, header, color, text, buttons, assignee, origin, this.app.getID());
         return this.success({ id: created });
     }
 }
@@ -50,14 +52,34 @@ function draft(modify: IModify, appUser: IUser, room: IRoom, header: string, col
     return modify.getCreator().startMessage().setSender(appUser).setRoom(room).setText(header).setAttachments([attachment(color, text)]);
 }
 
-async function render(modify: IModify, appUser: IUser, room: IRoom, id: string, header: string, color: string, text: string, buttons: Button[], appId: string): Promise<void> {
+async function render(modify: IModify, appUser: IUser, room: IRoom, id: string, header: string, color: string, text: string, buttons: Button[], assignee: string, origin: string, appId: string): Promise<void> {
+    const blocks = messageBlocks(appId, id, buttons, room, origin, assignee);
+    const body = text.trim();
     const builder = await modify.getUpdater().message(id, appUser);
-    builder.setRoom(room).setText(header).setAttachments([attachment(color, text)]).setBlocks(actionBlocks(appId, id, buttons)).setEditor(appUser);
+    builder.setRoom(room).setText(header).setAttachments([attachment(color, blocks.length ? `${header}\n${body}` : body)]).setBlocks(blocks).setEditor(appUser);
     await modify.getUpdater().finish(builder);
 }
 
 function attachment(color: string, text: string): IMessageAttachment {
-    return color ? { color, text } : { text };
+    const fields = [{ title: '', value: text.trim() }];
+    return color ? { color, fields } : { fields };
+}
+
+function messageBlocks(appId: string, messageId: string, buttons: Button[], room: IRoom, origin: string, username: string): IBlock[] {
+    const blocks = actionBlocks(appId, messageId, buttons);
+    if (!username || !origin) {
+        return blocks;
+    }
+    const user = encodeURIComponent(username);
+    const name = encodeURIComponent(room.slugifiedName);
+    const path = room.type === 'c' ? `/channel/${name}/members-list/${user}` : room.type === 'p' ? `/group/${name}/members-list/${user}` : `/direct/${encodeURIComponent(room.id)}/user-info/${user}`;
+    blocks.unshift({
+        type: 'section',
+        appId,
+        blockId: 'incident_assignee',
+        text: { type: 'mrkdwn', text: `assigned to [@${username}](${origin.replace(/\/$/, '')}${path})` },
+    } as IBlock);
+    return blocks;
 }
 
 function actionBlocks(appId: string, messageId: string, buttons: Button[]): IBlock[] {

@@ -156,6 +156,8 @@ class RocketChatProvider:
                 'header': self._header(message),
                 'color': STATUS_COLORS.get('frozen' if message.frozen else message.status) or '',
                 'text': self._body(message),
+                'assignee': message.assigned_user,
+                'origin': self.url,
                 'buttons': self._buttons(message, freeze_menu=freeze_menu and not message.frozen and message.status != 'closed'),
             },
         )

@@ -120,7 +120,7 @@ python -m pip install ./packages/impulse-rocketchat
 - The provider passes an empty `previewUrls` array to the native update method so attachment-only changes are applied
   even when the text is unchanged. This disables URL previews on edited incident messages. Thread replies set
   `parseUrls` to `false` on `chat.postMessage`, which skips URL parsing and the same link previews. The incident body lives in
-  the colored attachment with the buttons. The assignee name there links to `/direct/<username>` and does not notify. Other `@mentions` in that body are display-only and do not notify. The freeze menu
+  the colored attachment with the buttons. The assignee name there links to `<workspace>/direct/<username>` and does not notify. Other `@mentions` in that body are display-only and do not notify. The freeze menu
   splits duration choices across two attachments because one attachment is one button row. Buttons are rebuilt from
   IMPulse's current presentation, including maintenance/inhibition and manual-unfreeze state, and removed when the
   incident closes. IMPulse continues to own incident lookup, durations and business actions.

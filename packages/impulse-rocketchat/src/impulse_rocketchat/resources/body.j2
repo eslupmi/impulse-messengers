@@ -8,7 +8,7 @@
 {%- if url %}|  [source]({{ url }})  {% endif %}
 {%- if runbook %}|  [runbook]({{ runbook }})  {% endif %}
 {%- if incident.task_link %}|  [task]({{ incident.task_link }})  {% endif %}
-{%- if incident.assigned_user != "" %} _(assigned to [@{{ incident.assigned_user }}](/direct/{{ incident.assigned_user }}))_{% endif %}
+{%- if incident.assigned_user != "" and 'host=' in incident.link %}{% set host = incident.link.split('host=', 1)[1].split('&', 1)[0] | replace('%3A', ':') | replace('%2F', '/') %} _(assigned to [@{{ incident.assigned_user }}](https://{{ host }}/direct/{{ incident.assigned_user }}))_{% endif %}
 {%- if commonAnnotations.description %}
 _{{ commonAnnotations.description }}_{% endif %}
 {%- if alerts | length > 1 %}

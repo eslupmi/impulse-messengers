@@ -59,8 +59,7 @@ async function render(modify: IModify, appUser: IUser, room: IRoom, id: string, 
 }
 
 function attachment(color: string, text: string): IMessageAttachment {
-    const fields = [{ title: '', value: text.trim() }];
-    return color ? { color, fields } : { fields };
+    return color ? { color, text } : { text };
 }
 
 function actionBlocks(appId: string, messageId: string, buttons: Button[]): IBlock[] {

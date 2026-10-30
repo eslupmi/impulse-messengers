@@ -160,21 +160,20 @@ class RocketChatProvider:
             },
         )
         status = response.status
-        if not 200 <= status < 300:
-            response.close()
-            return None
-        data = await self._read(response)
-        if not isinstance(data, dict):
-            return None
-        content = data.get('content')
-        if isinstance(content, dict):
-            return content.get('id')
-        return data.get('id')
+        try:
+            data = await self._read(response)
+        except Exception:
+            data = None
+        content = data.get('content') if isinstance(data, dict) else None
+        message_id = content.get('id') if isinstance(content, dict) else data.get('id') if isinstance(data, dict) else None
+        if 200 <= status < 300 and message_id:
+            return message_id
+        logger.error('Rocket.Chat incident render failed', extra={'status': status, 'response': data})
+        return None
 
     async def create_incident(self, message: IncidentPresentation) -> MessageRef | None:
         message_id = await self._render_incident(message, '')
         if not message_id:
-            logger.error('Incident message creation failed', extra={'messenger': 'rocketchat'})
             return None
         return MessageRef(message.channel_id, message_id)
 

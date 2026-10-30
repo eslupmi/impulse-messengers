@@ -23,8 +23,6 @@ deployment behavior still requires verification.
 
 The implementation follows the official [messaging REST API](https://developer.rocket.chat/apidocs/messaging-api),
 [send-message API](https://developer.rocket.chat/apidocs/send-message),
-[message lookup](https://developer.rocket.chat/apidocs/get-message),
-[message removal](https://developer.rocket.chat/apidocs/delete-chat-message),
 [user lookup](https://developer.rocket.chat/apidocs/get-users-info),
 [team lookup](https://developer.rocket.chat/apidocs/get-team-info),
 [outgoing integration setup](https://docs.rocket.chat/docs/integrations), and
@@ -41,13 +39,9 @@ and [registered attachment-capable message updater](https://github.com/RocketCha
 
 1. Create a dedicated bot user and add it to every configured incident room and private team.
 2. Issue a personal access token for that user and record its user ID. The bot needs permission to send messages,
-   read configured users/teams, incident and button-command messages, and edit its own messages. Enable message editing and set **Block Message Editing After**
+   read configured users/teams and its own messages, and edit its own messages. Enable message editing and set **Block Message Editing After**
    to `0` so incidents can be updated for their entire lifetime. Access to a private team's information requires team
    membership or `view-all-teams`; membership avoids granting workspace-wide team access.
-   Grant the bot `delete-message` in the incident rooms so it can consume button commands posted by other users.
-   Enable **Allow Message Deleting**, set **Block Message Deleting After** to `0` (or at least five minutes), and disable
-   **Show Deleted Status** so consumed commands do not leave a deletion placeholder. Cleanup uses the bot's identity;
-   `force-delete-message` and user impersonation are not needed.
 3. In **Manage > Workspace > Integrations**, create an **Outgoing** integration with event **Message Sent**.
    Enable it, enter the configured incident rooms as the channels, set **Trigger Words** to `impulse`,
    set **URLs** to `<impulse_address>/app`, and set **Post as** to the bot username.
@@ -97,7 +91,6 @@ AUTH_REDIRECT_URL=https://<your_impulse_domain>/auth/callback
 
 Install `impulse-rocketchat` into the same environment as IMPulse; it registers through `impulse.messengers`.
 After startup, create a test incident, use **Take It** or **Release**, and confirm a notification appears in the same thread.
-Click from both the channel and the thread: the generated `impulse ...` command should disappear while the incident remains.
 Click **Freeze** and confirm the same message shows the four duration choices and **Back**.
 Check that **Back** restores the normal buttons without freezing, then choose a duration.
 Use the frozen incident's button to clear the manual freeze, and check maintenance or inhibition freezes remain intact.
@@ -134,15 +127,10 @@ python -m pip install ./packages/impulse-rocketchat
 - Selecting a duration first reads the original message with `chat.getMessage` and checks its ID, room, bot ownership
   and currently displayed option. Stale or typed duration commands for an inactive option are ignored. This adds one
   API read per duration selection; the read and the core action are not atomic, so it is not a core concurrency guarantee.
-- Native buttons send a message such as `impulse <incident_message_id> chain` under the clicking user. After authenticating
-  the callback, IMPulse reads that command message and verifies its ID, room, author and exact text before removing it
-  with `chat.delete`. The incident message, files, attachments and commands with replies are never removed. The message
-  may briefly appear until the webhook is processed; this consumes the command rather than preventing its creation.
-  Cleanup adds two API requests per click and must succeed before the business action runs. Missing read/delete
-  permissions fail the callback instead of silently leaving command text behind. A crash after cleanup but before the
-  business action can lose that click; the user can click again. No separate queue or cross-system transaction is added.
-  Typed commands follow the same rules and are consumed too; duration commands are accepted only while their menu
-  option is active. IMPulse continues to own incident lookup and business rules. Keep automatic webhook retries disabled.
+- Clicking a button sends a visible message such as `impulse <incident_message_id> chain` under the clicking user.
+  Typing an equivalent assignment, unfreeze or task command has the same effect; duration commands are accepted only
+  while their menu option is active. The outgoing event supplies the actor and room; IMPulse owns incident lookup
+  and business rules. Keep automatic webhook retries disabled because replaying a toggle can reverse a previous action.
 - Team mentions depend on Rocket.Chat's workspace features and settings. Use IMPulse `user_groups` when explicit individual
   mentions are preferred. An HTTP success response confirms acceptance, not delivery of a push notification to a device.
 - Rate limiting is intentionally conservative at one request per second. Bursts queue in IMPulse; callbacks share that

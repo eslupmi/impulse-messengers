@@ -217,30 +217,6 @@ class RocketChatProvider:
         data = await self._read(response)
         return DeliveryResult(status if data.get('success') else 502)
 
-    async def _consume_command(self, payload) -> None:
-        response = await self.http.get(f'{self.url}/api/v1/chat.getMessage', headers=self.headers,
-                                       params={'msgId': payload['message_id']})
-        if response.status != 200:
-            status = response.status
-            response.close()
-            raise RuntimeError(f'Rocket.Chat command lookup failed (HTTP {status})')
-        data = await self._read(response)
-        message = data['message']
-        expected = (payload['message_id'], payload['channel_id'], payload['user_id'], payload['text'])
-        actual = (message['_id'], message['rid'], message['u']['_id'], message['msg'])
-        if (data.get('success') is not True or actual != expected
-                or any(message.get(field) for field in ('attachments', 'files', 'file', 'tcount'))):
-            raise ValueError('invalid command message')
-        response = await self.http.post(f'{self.url}/api/v1/chat.delete', headers=self.headers,
-                                        json={'roomId': payload['channel_id'], 'msgId': payload['message_id']})
-        status = response.status
-        if not 200 <= status < 300:
-            response.close()
-            raise RuntimeError(f'Rocket.Chat command removal failed (HTTP {status}); check bot delete-message permission')
-        data = await self._read(response)
-        if data.get('success') is not True or data.get('_id') != payload['message_id']:
-            raise RuntimeError('Rocket.Chat command removal failed; check bot delete-message permission')
-
     async def parse_interaction(self, request: InteractionRequest) -> Interaction | ProviderResponse:
         if request.method != 'POST':
             return ProviderResponse(status_code=405)
@@ -263,11 +239,6 @@ class RocketChatProvider:
             prefix, message_id, action = payload['text'].split()
             if prefix != COMMAND_PREFIX or not message_id or action not in COMMANDS:
                 raise ValueError('invalid command')
-            command_id = payload['message_id']
-            if not isinstance(command_id, str) or not command_id or command_id == message_id:
-                raise ValueError('invalid command message ID')
-            # Native buttons send ordinary messages; consume only the verified command, never the incident.
-            await self._consume_command(payload)
             command = COMMANDS[action]
             if command.action == InteractionAction.FREEZE:
                 response = await self.http.get(f'{self.url}/api/v1/chat.getMessage', headers=self.headers,
@@ -280,7 +251,7 @@ class RocketChatProvider:
                 if (data.get('success') is not True or original['_id'] != message_id or original['rid'] != channel_id
                         or original['u']['_id'] != self.headers['X-User-Id']):
                     return ProviderResponse(status_code=400)
-                # Accept durations only while their menu is still rendered.
+                # Commands are visible: accept durations only while their menu is still rendered.
                 if not any(button.get('msg') == f'{COMMAND_PREFIX} {message_id} {action}'
                            for attachment in original.get('attachments', [])
                            for button in attachment.get('actions', [])):

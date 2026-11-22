@@ -57,7 +57,7 @@ class MattermostProvider:
         status = response.status
         if status != 200:
             response.close()
-            logger.debug('User details fetch failed', extra={'user_id': user_id, 'status': status})
+            logger.warning('User details fetch failed', extra={'user_id': user_id, 'status': status})
             return UserProfile(id=user_id, exists=False)
         data = await self._read_json(response)
         return UserProfile(
@@ -77,7 +77,7 @@ class MattermostProvider:
             status = response.status
             if status != 200:
                 response.close()
-                logger.debug('Group details fetch failed', extra={'group_id': group_id, 'status': status})
+                logger.warning('Group details fetch failed', extra={'group_id': group_id, 'status': status})
                 profiles.append(GroupProfile(id=group_id, name=None, exists=False))
             else:
                 data = await self._read_json(response)

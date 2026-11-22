@@ -102,11 +102,11 @@ class TelegramProvider:
         status = response.status
         if status != 200:
             response.close()
-            logger.debug('User details fetch failed', extra={'user_id': user_id, 'status': status})
+            logger.warning('User details fetch failed', extra={'user_id': user_id, 'status': status})
             return UserProfile(id=user_id, exists=False)
         data = await self._read_json(response)
         if not data.get('ok'):
-            logger.debug('Telegram API error', extra={'user_id': user_id, 'status': status})
+            logger.warning('Telegram API error', extra={'user_id': user_id, 'status': status})
             return UserProfile(id=user_id, exists=False)
         chat = data.get('result') or {}
         full_name = f"{chat.get('first_name') or ''} {chat.get('last_name') or ''}".strip()
